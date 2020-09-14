@@ -1,8 +1,14 @@
-const express = require('express');
-const mongoose = require('mongoose');
+const express = require("express");
+const mongoose = require("mongoose");
+
+
 const app = express();
+
 app.use(express.json());
-const uri = "mongodb+srv://admin:1234@cluster0.jxxjh.mongodb.net/pwitt?retryWrites=true&w=majority";
+
+// String de conexión con la base de datos
+const uri = "mongodb+srv://grupo_tres:123hola@cluster0.b6m6q.mongodb.net/biblioteca?retryWrites=true&w=majority";
+
 async function conectar() {
     try{
         await mongoose.connect(uri, {
@@ -15,22 +21,24 @@ async function conectar() {
         console.log(e);
     }
 };
+
 conectar();
 
-// Paso 1 Definir esquema/s
-const BookSchema = new mongoose.Schema({
+// Paso 1: definir esquema/s
+const LibroSchema = new mongoose.Schema({
     name: String,
     author: String,
     gender: String,
-    id: String,
     lended: String
-
 });
 
-// Paso 2 Armo el modelo
-const BookModel = mongoose.model("books", BookSchema);
+// Paso 2: Armo el modelo
+const LibroModel = mongoose.model("libros", LibroSchema);
 
-app.post("/book", async (req, res)=>{
+// CRUD de Libro - Create Read Update Delete
+// Create post
+
+app.post("/libro", async (req, res)=>{
     try {
         // verificacion de la info que recibo;
         let name = req.body.name;
@@ -78,7 +86,7 @@ app.post("/book", async (req, res)=>{
         lended: lended
         }
 
-        let BookSave = await BookModel.create(book);
+        let LibroSave = await LibroModel.create(book);
         
         console.log(BookSave);
         res.status(200).send(BookSave);
@@ -87,8 +95,168 @@ app.post("/book", async (req, res)=>{
         console.log(e);
         res.status(422).send(e);
     }
-}
+});
+
+
+// CRUD de Genero - Create Read Update Delete
+// Create post
+
+const GeneroSchema1 = new mongoose.Schema({
+    name : String,
+    deleted: Number
+});
+
+const GeneroModel1 = mongoose.model("generos", GeneroSchema1);
+
+const LibroSchema1 = new mongoose.Schema({
+    name: String,
+    author: String,
+    gender: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "generos"
+    },
+    lended: String
+});
+
+// API /genero
+app.get("/genero", async (req, res)=>{
+    try{
+        let respuesta = null;
+
+        respuesta = await GeneroModel1.find({deleted: 0});
+        
+        res.status(200).send(respuesta);
+    }
+    catch(e){
+        console.log(e);
+        res.status(422).send({error: e});
+    }
+});
+
+app.get("/genero/:id", async (req, res)=>{
+    try{
+        let id = req.params.id;
+        let respuesta = null;
+
+        respuesta = await GeneroModel1.findById(id);
+
+        res.status(200).send(respuesta);
+    }
+    catch(e){
+        console.log(e);
+        res.status(422).send({error: e});
+    }
+});
+
+app.post("/genero", async (req, res)=>{
+    try{
+        let name = req.body.name;
+
+        if(name == undefined){
+            throw new Error("Tenes que enviar un titulo");
+        }
+
+        if(name == ""){
+            throw new Error("El titulo no puede ser vacio");
+        }
+
+        let existeName = null;
+
+        existeName = await GeneroModel1.find({name: name.toUpperCase()});
+
+        if(existeName.length > 0){
+          throw new Error("Ese genero ya existe");  
+        }
+
+        let genero = {
+            name: name.toUpperCase(),
+            deleted: 0
+        }
+
+        await GeneroModel1.create(genero);
+
+        res.status(200).send(genero);
+    }
+    catch(e){
+        console.log(e);
+        res.status(422).send({error: e});
+    }
+});
+
+app.delete("/genero/:id", async (req, res)=>{
+    try{
+        let id = req.params.id;
+
+        let respuesta = null;
+
+        respuesta = await GeneroModel1.findByIdAndDelete(id);
+
+        let generoGuardado = await GeneroModel1.findById(id);
+
+        generoGuardado.deleted = 1;
+
+        await GeneroModel1.findByIdAndUpdate(id, generoGuardado);
+
+        res.status(200).send({"message": "OK"})
+    }
+    catch(e){
+        console.log(e);
+        res.status(422).send({error: e});
+    }
+});
+
+app.put("/genero/:id", async (req, res)=>{
+    try{
+        // Validación de datos
+        let name = req.body.name;
+        let id = req.params.id;
+
+        if(name == undefined){
+            throw new Error("Tenes que enviar titulo");            
+        }
+
+        if(name = ""){
+            throw new Error("El titulo no puede ser vacio");
+        }
+
+        // Verificamos condiciones para poder modificar
+        let generoExiste = await GeneroModel1.find({"name": name});
+
+        if(generoExiste.length > 0){
+            generoExiste.forEach(unGenero => {
+                if(unGenero.id != id){
+                    throw new Error("Ya existe ese genero");
+                }
+            });
+        }
+
+        let librosConEseGenero = null;
+        
+        librosConEseGenero = await LibroModel1.find({"genero": id});
+
+        if(librosConEseGenero.length > 0){
+            throw new Error("No se puede modificar, hay libros asociados");
+        }
+
+        let generoModificado = {
+            name: name
+        }
+
+        await GeneroModel1.findByIdAndUpdate(id, generoModificado);
+
+        res.status(200).send(generoModificado);
+
+    
+    }
+    catch(e){
+        console.log(e);
+        res.status(422).send({error: e});
+    }
+});
+
+
+
 
 app.listen(3000, ()=>{
     console.log("Servidor escuchando en el puerto 3000");
-}))
+});
