@@ -28,12 +28,15 @@ conectar();
 const LibroSchema = new mongoose.Schema({
     name: String,
     author: String,
-    gender: String,
+    gender: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "generos"
+    },
     lended: String
 });
 
 // Paso 2: Armo el modelo
-const LibroModel = mongoose.model("libros", LibroSchema);
+const LibroModel = mongoose.model("libros", BookSchema);
 
 // CRUD de Libro - Create Read Update Delete
 // Create post
@@ -44,7 +47,6 @@ app.post("/libro", async (req, res)=>{
         let name = req.body.name;
         let author = req.body.author;
         let gender = req.body.gender;
-        let id = req.body.id;
         let lended = req.body.lended;
 
         if(name == undefined){
@@ -55,9 +57,6 @@ app.post("/libro", async (req, res)=>{
         }
         if( gender == undefined){
             throw new Error("No enviaste genero");
-        }
-        if(id == undefined){
-            throw new Error("No enviaste id");
         }
         if(lended == undefined){
             throw new Error("No enviaste cuit");
@@ -71,9 +70,6 @@ app.post("/libro", async (req, res)=>{
         if(gender == '' ){
             throw new Error("El  genero no puede estar vacio");
         }
-        if(id == ''){
-            throw new Error("El id no puede estar vacio");
-        }
         if(lended == ''){
             throw new Error("El prestamo no puede estar vacio");
         }
@@ -82,11 +78,10 @@ app.post("/libro", async (req, res)=>{
         name:  name,
         author: author,
         gender: gender,
-        id: id,
         lended: lended
         }
 
-        let LibroSave = await LibroModel.create(book);
+        let BookSave = await BookModel.create(book);
         
         console.log(BookSave);
         res.status(200).send(BookSave);
@@ -97,33 +92,48 @@ app.post("/libro", async (req, res)=>{
     }
 });
 
+//Delete 
+
+app.delete("/book/:id", async (req, res)=>{
+    try{
+        let id = req.params.id;
+
+        let respuesta = null;
+
+        respuesta = await LibroModel.findByIdAndDelete(id);
+
+        let LibroGuardado = await LibroModel.findById(id);
+
+        LibroGuardado.deleted = 1;
+
+        await LibroModel.findByIdAndUpdate(id, LibroGuardado);
+
+        res.status(200).send({"message": "OK"})
+    }
+    catch(e){
+        console.log(e);
+        res.status(422).send({error: e});
+    }
+});
 
 // CRUD de Genero - Create Read Update Delete
 // Create post
 
-const GeneroSchema1 = new mongoose.Schema({
+const GeneroSchema = new mongoose.Schema({
     name : String,
     deleted: Number
 });
 
-const GeneroModel1 = mongoose.model("generos", GeneroSchema1);
+const GeneroModel = mongoose.model("generos", GeneroSchema);
 
-const LibroSchema1 = new mongoose.Schema({
-    name: String,
-    author: String,
-    gender: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "generos"
-    },
-    lended: String
-});
+
 
 // API /genero
 app.get("/genero", async (req, res)=>{
     try{
         let respuesta = null;
 
-        respuesta = await GeneroModel1.find({deleted: 0});
+        respuesta = await GeneroModel.find({deleted: 0});
         
         res.status(200).send(respuesta);
     }
@@ -138,7 +148,7 @@ app.get("/genero/:id", async (req, res)=>{
         let id = req.params.id;
         let respuesta = null;
 
-        respuesta = await GeneroModel1.findById(id);
+        respuesta = await GeneroModel.findById(id);
 
         res.status(200).send(respuesta);
     }
@@ -162,7 +172,7 @@ app.post("/genero", async (req, res)=>{
 
         let existeName = null;
 
-        existeName = await GeneroModel1.find({name: name.toUpperCase()});
+        existeName = await GeneroModel.find({name: name.toUpperCase()});
 
         if(existeName.length > 0){
           throw new Error("Ese genero ya existe");  
@@ -173,7 +183,7 @@ app.post("/genero", async (req, res)=>{
             deleted: 0
         }
 
-        await GeneroModel1.create(genero);
+        await GeneroModel.create(genero);
 
         res.status(200).send(genero);
     }
@@ -189,13 +199,13 @@ app.delete("/genero/:id", async (req, res)=>{
 
         let respuesta = null;
 
-        respuesta = await GeneroModel1.findByIdAndDelete(id);
+        respuesta = await GeneroModel.findByIdAndDelete(id);
 
-        let generoGuardado = await GeneroModel1.findById(id);
+        let generoGuardado = await GeneroModel.findById(id);
 
         generoGuardado.deleted = 1;
 
-        await GeneroModel1.findByIdAndUpdate(id, generoGuardado);
+        await GeneroModel.findByIdAndUpdate(id, generoGuardado);
 
         res.status(200).send({"message": "OK"})
     }
@@ -220,7 +230,7 @@ app.put("/genero/:id", async (req, res)=>{
         }
 
         // Verificamos condiciones para poder modificar
-        let generoExiste = await GeneroModel1.find({"name": name});
+        let generoExiste = await GeneroModel.find({"name": name});
 
         if(generoExiste.length > 0){
             generoExiste.forEach(unGenero => {
@@ -232,7 +242,7 @@ app.put("/genero/:id", async (req, res)=>{
 
         let librosConEseGenero = null;
         
-        librosConEseGenero = await LibroModel1.find({"genero": id});
+        librosConEseGenero = await LibroModel.find({"genero": id});
 
         if(librosConEseGenero.length > 0){
             throw new Error("No se puede modificar, hay libros asociados");
@@ -242,7 +252,7 @@ app.put("/genero/:id", async (req, res)=>{
             name: name
         }
 
-        await GeneroModel1.findByIdAndUpdate(id, generoModificado);
+        await GeneroModel.findByIdAndUpdate(id, generoModificado);
 
         res.status(200).send(generoModificado);
 
@@ -260,3 +270,8 @@ app.put("/genero/:id", async (req, res)=>{
 app.listen(3000, ()=>{
     console.log("Servidor escuchando en el puerto 3000");
 });
+
+
+
+
+
